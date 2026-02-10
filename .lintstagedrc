@@ -1,0 +1,4 @@
+{
+  "*.{ts,js}": "biome check --write",
+  "*.{md,yml,yaml}": "bunx prettier --prose-wrap always --write"
+}

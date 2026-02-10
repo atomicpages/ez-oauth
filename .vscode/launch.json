@@ -1,0 +1,19 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "bun",
+			"internalConsoleOptions": "neverOpen",
+			"request": "launch",
+			"name": "Debug Server (Watch)",
+			"program": "${workspaceFolder}/scratches/server.ts",
+			"cwd": "${workspaceFolder}",
+			"stopOnEntry": false,
+			"watchMode": true,
+			"env": {
+				"NODE_ENV": "development",
+				"SWAGGER_ENABLED": "true"
+			}
+		}
+	]
+}
