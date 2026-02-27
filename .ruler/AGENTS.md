@@ -36,3 +36,16 @@ Docs structure
 
 - Additional context lives in other `.ruler/*.md` files; keep them concise and
   practical
+
+Specialist agents
+
+- **OAuth principal engineer**: `.opencode/agent/oauth-principal-engineer.md`
+  - Use when you need expert OAuth architecture, implementation guidance, or
+    code/design review for secure, maintainable auth (OAuth 2.x, PKCE, DPoP,
+    discovery, DCR, revocation, introspection, device flow, threat mitigation).
+  - Use proactively after meaningful auth-related code changes to review
+    recently written code and propose concrete fixes.
+  - Use for designing scalable, DRY, production-grade auth components (e.g.
+    multi-tenant AS/RS integration, token strategy, key management).
+  - Launch via the Task tool when the request is architecture-heavy or
+    security-critical OAuth work.
