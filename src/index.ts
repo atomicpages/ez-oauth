@@ -1,3 +1,4 @@
+export * from "./discovery";
 export * from "./errors/index";
 export * from "./OAuthClient";
 export * from "./OAuthConfig";

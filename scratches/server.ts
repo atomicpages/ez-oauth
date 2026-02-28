@@ -9,21 +9,23 @@ const storage = new MemoryStorageProvider();
 async function google(): Promise<Response> {
   const defaultBaseUrl = `http://${server.hostname}:${server.port}`;
 
-  const config = (
-    await GoogleOAuthConfig.discover("https://accounts.google.com", {
+  const client = await OAuthClient.fromDiscovery(
+    "https://accounts.google.com",
+    {
       clientId: Bun.env.GOOGLE_CLIENT_ID!,
       clientSecret: Bun.env.GOOGLE_CLIENT_SECRET!,
       redirectUri: `${Bun.env.REDIRECT_BASE_URL || defaultBaseUrl}mcp/oauth/callback`,
-    })
-  )
+    },
+    { ConfigClass: GoogleOAuthConfig, storage },
+  );
+
+  client.config
     .withRefreshToken()
     .withScopes([
       "https://www.googleapis.com/auth/userinfo.email",
       "https://www.googleapis.com/auth/userinfo.profile",
     ]);
 
-  const state = new OAuthState();
-  const client = new OAuthClient(config, state, storage);
   const url = await client.createAuthorizationUrl();
 
   return new Response(url);

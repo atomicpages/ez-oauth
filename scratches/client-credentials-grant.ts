@@ -138,11 +138,14 @@ async function exampleNoCache() {
   if (!clientId || !clientSecret) return;
 
   // Config must have client_id + client_secret (e.g. from discover).
-  const config = await OAuthConfig.discover("https://accounts.google.com", {
-    clientId,
-    clientSecret,
-    redirectUri: "http://localhost:3005/callback", // not used for grant
-  });
+  const config = await OAuthConfig.fromDiscovery(
+    "https://accounts.google.com",
+    {
+      clientId,
+      clientSecret,
+      redirectUri: "http://localhost:3005/callback", // not used for grant
+    },
+  );
   config.withScopes(["https://www.googleapis.com/auth/cloud-platform"]);
 
   const grant = new ClientCredentialsGrant(config);
@@ -166,11 +169,14 @@ async function exampleWithCache() {
   );
   const cache = new MemoryStorageProvider();
 
-  const config = await OAuthConfig.discover("https://accounts.google.com", {
-    clientId,
-    clientSecret,
-    redirectUri: "http://localhost:3005/callback",
-  });
+  const config = await OAuthConfig.fromDiscovery(
+    "https://accounts.google.com",
+    {
+      clientId,
+      clientSecret,
+      redirectUri: "http://localhost:3005/callback",
+    },
+  );
   config.withScopes(["https://www.googleapis.com/auth/cloud-platform"]);
 
   const grant = new ClientCredentialsGrant(config, { cache });

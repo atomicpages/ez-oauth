@@ -1,11 +1,13 @@
 import { HTTPError } from "ky";
 import * as client from "openid-client";
 import URLSheriff from "url-sheriff";
+import type { DiscoverOptions } from "./discovery";
 import { OAuthClientError } from "./errors/OAuthClientError";
 import { OAuthStateError } from "./errors/OAuthStateError";
-import { OAuthConfig } from "./OAuthConfig";
+import type { OAuthConfig } from "./OAuthConfig";
 import { OAuthState } from "./state/OAuthState";
 import type { StorageProvider } from "./storage/StorageProvider";
+import { toURL } from "./utils/url";
 
 type URLSheriffConfig = ConstructorParameters<typeof URLSheriff>[0];
 
@@ -13,7 +15,7 @@ type OAuthClientOptions = {
   sheriffConfig?: URLSheriffConfig;
 };
 
-type OAuthConfigFactory<T extends OAuthConfig = OAuthConfig> = {
+export type OAuthConfigFactory<T extends OAuthConfig = OAuthConfig> = {
   fromJSON(json: ReturnType<OAuthConfig["toJSON"]>): T;
 };
 
@@ -83,7 +85,7 @@ export class OAuthClient {
     try {
       const tokens = await client.authorizationCodeGrant(
         this.config.config,
-        OAuthConfig.toURL(url),
+        toURL(url),
         {
           expectedState: this.state.state,
           pkceCodeVerifier: this.state.codeVerifier,
@@ -94,7 +96,7 @@ export class OAuthClient {
       return tokens;
     } catch (e) {
       if (e instanceof client.ClientError) {
-        let reason: any;
+        let reason: unknown;
 
         if (e.cause instanceof HTTPError) {
           reason = await e.cause?.response.body?.json();
@@ -130,6 +132,28 @@ export class OAuthClient {
       token,
       this.config.additionalParams,
     );
+  }
+
+  /**
+   * Build an OAuthClient from AS metadata discovery (one-call flow).
+   * Does not cache; callers may cache the returned client's config or wrap discovery.
+   */
+  static async fromDiscovery<T extends OAuthConfig = OAuthConfig>(
+    issuer: URL | string,
+    options: DiscoverOptions,
+    opts: {
+      ConfigClass: OAuthConfigFactory<T>;
+      storage?: StorageProvider | null;
+      state?: OAuthState | null;
+    },
+  ): Promise<OAuthClient> {
+    const config = await (
+      opts.ConfigClass as unknown as typeof OAuthConfig
+    ).fromDiscovery(issuer, options);
+
+    const state = opts.state ?? new OAuthState();
+
+    return new OAuthClient(config, state, opts.storage ?? undefined);
   }
 
   static async fromStorage<T extends OAuthConfig = OAuthConfig>(

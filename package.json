@@ -47,7 +47,6 @@
   },
   "dependencies": {
     "ky": "^1.14.3",
-    "lru-cache": "^11.2.6",
     "openid-client": "^6.8.2",
     "url-sheriff": "^1.0.0"
   },

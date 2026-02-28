@@ -1,15 +1,10 @@
-import assert from "node:assert";
 import type { BodyInit } from "bun";
 import ky, { type Hooks } from "ky";
-import { LRUCache } from "lru-cache";
 import * as client from "openid-client";
+import type { DcrOptions, DiscoverOptions } from "./discovery";
+import { OAuthDiscovery } from "./discovery";
 import { ClientAuth, type GrantType } from "./enum";
-
-const PROTECTED_RESOURCE_DISCOVERY_JWT_MEDIA_TYPE =
-  "application/oauth-protected-resource-jwt";
-
-const PROTECTED_RESOURCE_DISCOVERY_JSON_MEDIA_TYPE =
-  "application/oauth-protected-resource+json";
+import { toURL } from "./utils/url";
 
 /**
  * Base OAuth configuration wrapper
@@ -18,11 +13,6 @@ const PROTECTED_RESOURCE_DISCOVERY_JSON_MEDIA_TYPE =
  * Subclass this to customize HTTP behavior for specific providers
  */
 export class OAuthConfig {
-  private static readonly cache = new LRUCache<string, any>({
-    max: 500,
-    ttl: 1000 * 60 * 60 * 24 * 7, // 7 days
-  });
-
   protected _additionalParams: Record<string, string> = {};
   protected _scopes: string[] = [];
   readonly supportsPKCE: boolean = false;
@@ -34,7 +24,7 @@ export class OAuthConfig {
   ) {
     userConfig[client.customFetch] = this.createCustomFetch();
     this.supportsPKCE = userConfig.serverMetadata().supportsPKCE();
-    this.redirectUri = OAuthConfig.toURL(redirectUri);
+    this.redirectUri = toURL(redirectUri);
 
     if (this._additionalParams) {
       for (const [key, value] of Object.entries(this._additionalParams)) {
@@ -89,52 +79,6 @@ export class OAuthConfig {
     return this.userConfig;
   }
 
-  private static async getProtectedResourceDiscovery(issuer: URL | string) {
-    if (OAuthConfig.cache.has(issuer.toString())) {
-      return OAuthConfig.cache.get(issuer.toString());
-    }
-
-    const url = OAuthConfig.toURL(issuer);
-    url.pathname = ".well-known/oauth-protected-resource";
-
-    const res = await ky.get(url.toString(), {
-      headers: {
-        Accept: PROTECTED_RESOURCE_DISCOVERY_JSON_MEDIA_TYPE,
-      },
-    });
-
-    if (res.ok) {
-      if (
-        res.headers
-          .get("Content-Type")
-          ?.includes(PROTECTED_RESOURCE_DISCOVERY_JWT_MEDIA_TYPE)
-      ) {
-        throw new Error(
-          `${PROTECTED_RESOURCE_DISCOVERY_JWT_MEDIA_TYPE} is not supported`,
-        );
-      }
-
-      try {
-        const json = await res.json<{
-          authorization_servers: [string, ...string[]];
-          bearer_methods_supported: [string, ...string[]];
-          resource_endpoints?: [string, ...string[]];
-          resource_signing_alg_values_supported: [string, ...string[]];
-          resource: string;
-          resource_documentation: string;
-        }>();
-
-        OAuthConfig.cache.set(issuer.toString(), json);
-
-        return json;
-      } catch (error) {
-        throw new Error(`Invalid protected resource discovery: ${res}`);
-      }
-    }
-
-    return null;
-  }
-
   static toClientAuth(type: ClientAuth) {
     switch (type) {
       case ClientAuth.CLIENT_SECRET_JWT:
@@ -154,95 +98,45 @@ export class OAuthConfig {
     }
   }
 
-  static async dcr(
-    this: new (
-      userConfig: client.Configuration,
-      redirectUri: string | URL,
-    ) => OAuthConfig,
-    issuer: URL | string,
-    options: {
-      algorithm?: "oidc" | "oauth2" | "protected-resource";
-      redirectUri: string | URL;
-    },
-  ): Promise<OAuthConfig> {
-    let url = OAuthConfig.toURL(issuer);
-
-    if (options.algorithm === "protected-resource") {
-      const discovery = await OAuthConfig.getProtectedResourceDiscovery(issuer);
-
-      if (discovery) {
-        assert.ok(
-          discovery.authorization_servers.length > 0,
-          "No authorization servers found",
-        );
-
-        url = new URL(discovery.authorization_servers[0]);
-      }
-    }
-
-    const config = await client.dynamicClientRegistration(url, {});
-
-    return new OAuthConfig(config, options.redirectUri);
-  }
-
-  static cimd(...args: Parameters<typeof client.dynamicClientRegistration>) {
-    return client.dynamicClientRegistration(...args);
-  }
-
-  static async discover<T extends OAuthConfig = OAuthConfig>(
+  /**
+   * Build config from AS metadata discovery. Does not cache; callers may cache.
+   */
+  static async fromDiscovery<T extends OAuthConfig = OAuthConfig>(
     this: new (
       userConfig: client.Configuration,
       redirectUri: string | URL,
     ) => T,
     issuer: URL | string,
-    options: {
-      clientId: string;
-      clientSecret?: string;
-      redirectUri: string;
-      /**
-       * The algorithm to use for the discovery.
-       * @default "oidc"
-       */
-      algorithm?: "oidc" | "oauth2" | "protected-resource";
-    },
+    options: DiscoverOptions,
   ): Promise<T> {
-    let url = OAuthConfig.toURL(issuer);
+    const configuration = await OAuthDiscovery.discover(issuer, options);
 
-    if (options.algorithm === "protected-resource") {
-      const discovery = await OAuthConfig.getProtectedResourceDiscovery(issuer);
+    return new OAuthConfig(configuration, options.redirectUri) as T;
+  }
 
-      if (discovery) {
-        assert.ok(
-          discovery.authorization_servers.length > 0,
-          "No authorization servers found",
-        );
-
-        url = new URL(discovery.authorization_servers[0]);
-      }
-    }
-
-    return new OAuthConfig(
-      await client.discovery(
-        url,
-        options.clientId,
-        options.clientSecret,
-        undefined,
-        {
-          algorithm:
-            options.algorithm === "protected-resource"
-              ? "oauth2"
-              : options.algorithm,
-        },
-      ),
-      options.redirectUri,
-    );
+  /**
+   * Build config from Dynamic Client Registration. Does not cache; callers may cache.
+   */
+  static async fromDcr<T extends OAuthConfig = OAuthConfig>(
+    this: new (
+      userConfig: client.Configuration,
+      redirectUri: string | URL,
+    ) => T,
+    issuer: URL | string,
+    options: DcrOptions,
+  ): Promise<T> {
+    const configuration = await OAuthDiscovery.dcr(issuer, options);
+    const redirectUri =
+      options.redirectUri instanceof URL
+        ? options.redirectUri
+        : new URL(options.redirectUri);
+    return new OAuthConfig(configuration, redirectUri) as T;
   }
 
   static toURL(url: URL | string): URL {
     if (url instanceof URL) {
       return url;
     }
-
     return new URL(url);
   }
 
@@ -273,7 +167,7 @@ export class OAuthConfig {
       clientId,
     );
 
-    return new OAuthConfig(clientConfig, redirectUri);
+    return new OAuthConfig(clientConfig, redirectUri) as T;
   }
 
   static fromJSON(json: ReturnType<OAuthConfig["toJSON"]>): OAuthConfig {
