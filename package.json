@@ -46,6 +46,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "jose": "^6.1.3",
     "ky": "^1.14.3",
     "openid-client": "^6.8.2",
     "url-sheriff": "^1.0.0"
