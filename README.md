@@ -27,6 +27,32 @@ compliant. Works with bun, deno, and node.js.
   - Bun/[`redis`](https://npm.im/redis) compatible `RedisStorageProvider`
   - in-memory storage provider for testing/non-distributed use cases
 
+## Client credentials (M2M)
+
+For machine-to-machine flows, use `ClientCredentialsGrant` with an
+`OAuthConfig`. A redirect URI is **not** required for this flow — omit
+`redirectUri` in discovery options:
+
+```ts
+import { ClientCredentialsGrant, OAuthConfig } from "ez-oauth";
+
+const config = await OAuthConfig.fromDiscovery("https://accounts.example.com", {
+  clientId: process.env.CLIENT_ID!,
+  clientSecret: process.env.CLIENT_SECRET!,
+  // redirectUri omitted — not used for client credentials
+});
+
+config.withScopes(["scope1", "scope2"]);
+
+const grant = new ClientCredentialsGrant(config);
+const tokens = await grant.getToken(); // optional: pass { resource: "..." } for RFC 8707
+```
+
+Optional caching: pass a `StorageProvider` as `options.cache` so tokens are
+reused until near expiry. See
+[scratches/client-credentials-grant.ts](scratches/client-credentials-grant.ts)
+for a full example.
+
 ## Planned Features
 
 - Expand RFC 9728 support to include `application/oauth-protected-resource-jwt`

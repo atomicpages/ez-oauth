@@ -98,8 +98,12 @@ export class OAuthConfig {
     }
   }
 
+  /** Placeholder redirect URI when building config for client-credentials-only (redirect_uri not used in that flow). */
+  static readonly PLACEHOLDER_REDIRECT_URI = "http://localhost";
+
   /**
    * Build config from AS metadata discovery. Does not cache; callers may cache.
+   * For client-credentials (M2M) only, omit options.redirectUri; a placeholder is used and never sent to the AS.
    */
   static async fromDiscovery<T extends OAuthConfig = OAuthConfig>(
     this: new (
@@ -110,12 +114,15 @@ export class OAuthConfig {
     options: DiscoverOptions,
   ): Promise<T> {
     const configuration = await OAuthDiscovery.discover(issuer, options);
+    const redirectUri =
+      options.redirectUri ?? OAuthConfig.PLACEHOLDER_REDIRECT_URI;
 
-    return new OAuthConfig(configuration, options.redirectUri) as T;
+    return new OAuthConfig(configuration, redirectUri) as T;
   }
 
   /**
    * Build config from Dynamic Client Registration. Does not cache; callers may cache.
+   * For client-credentials (M2M) only, omit options.redirectUri; a placeholder is used and never sent to the AS.
    */
   static async fromDcr<T extends OAuthConfig = OAuthConfig>(
     this: new (
@@ -127,9 +134,11 @@ export class OAuthConfig {
   ): Promise<T> {
     const configuration = await OAuthDiscovery.dcr(issuer, options);
     const redirectUri =
-      options.redirectUri instanceof URL
-        ? options.redirectUri
-        : new URL(options.redirectUri);
+      options.redirectUri !== undefined
+        ? options.redirectUri instanceof URL
+          ? options.redirectUri
+          : new URL(options.redirectUri)
+        : new URL(OAuthConfig.PLACEHOLDER_REDIRECT_URI);
     return new OAuthConfig(configuration, redirectUri) as T;
   }
 

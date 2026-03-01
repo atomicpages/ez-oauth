@@ -1,3 +1,4 @@
+export * from "./ClientCredentialsGrant";
 export * from "./discovery";
 export * from "./errors/index";
 export * from "./OAuthClient";

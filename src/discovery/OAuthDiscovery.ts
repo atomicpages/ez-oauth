@@ -162,14 +162,16 @@ export type OAuthDiscoveryAlgorithm = NonNullable<
 export type DiscoverOptions = {
   clientId: string;
   clientSecret?: string;
-  redirectUri: string;
+  /** Not required for client-credentials (M2M) flow; omit when using only that grant. */
+  redirectUri?: string;
   algorithm?: OAuthDiscoveryAlgorithm;
   /** Required when algorithm is protected-resource and the server returns JWT-signed metadata. */
   protectedResourceJwt?: ProtectedResourceDiscoveryJwtOptions;
 };
 
 export type DcrOptions = {
-  redirectUri: string | URL;
+  /** Not required for client-credentials (M2M) flow; omit when using only that grant. */
+  redirectUri?: string | URL;
   algorithm?: OAuthDiscoveryAlgorithm;
   /** Required when algorithm is protected-resource and the server returns JWT-signed metadata. */
   protectedResourceJwt?: ProtectedResourceDiscoveryJwtOptions;
