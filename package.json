@@ -43,7 +43,10 @@
   ],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test": "bun test src",
+    "test:unit": "bun test src",
+    "test:integration": "bun test integration"
   },
   "dependencies": {
     "jose": "^6.1.3",

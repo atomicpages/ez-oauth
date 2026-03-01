@@ -167,6 +167,8 @@ export type DiscoverOptions = {
   algorithm?: OAuthDiscoveryAlgorithm;
   /** Required when algorithm is protected-resource and the server returns JWT-signed metadata. */
   protectedResourceJwt?: ProtectedResourceDiscoveryJwtOptions;
+  /** Allow HTTP (non-TLS) for discovery and token endpoints. Test/local only; do not use in production. */
+  allowInsecureRequests?: boolean;
 };
 
 export type DcrOptions = {
@@ -322,6 +324,11 @@ export class OAuthDiscovery {
     issuer: URL | string,
     options: DiscoverOptions,
   ): Promise<Configuration> {
+    assert.ok(
+      process.env.NODE_ENV === "production" && !options.allowInsecureRequests,
+      "allowInsecureRequests is only allowed in development or test environments",
+    );
+
     const algorithm = options.algorithm ?? "oidc";
 
     const server = await OAuthDiscovery.resolveAuthorizationServerUrl(
@@ -334,13 +341,26 @@ export class OAuthDiscovery {
     const discoveryAlgorithm =
       algorithm === "protected-resource" ? "oauth2" : algorithm;
 
-    return client.discovery(
+    const configuration = await client.discovery(
       server,
       options.clientId,
       options.clientSecret,
       undefined,
-      { algorithm: discoveryAlgorithm },
+      {
+        algorithm: discoveryAlgorithm,
+        ...(options.allowInsecureRequests
+          ? {
+              execute: [client.allowInsecureRequests],
+            }
+          : {}),
+      },
     );
+
+    if (options.allowInsecureRequests) {
+      client.allowInsecureRequests(configuration);
+    }
+
+    return configuration;
   }
 
   /**

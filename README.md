@@ -13,7 +13,8 @@ compliant. Works with bun, deno, and node.js.
   - Machine-to-machine flow
   - Refresh Token, Device Authorization, Client-Initiated Backchannel
     Authentication (CIBA), and Client Credentials Grants
-  - Token Introspection and Revocation
+  - Token Introspection and Revocation (introspection via
+    `OAuthClient#introspectToken`)
   - Authorization Server Issuer Identification
   - JWT Secured Introspection, Response Mode (JARM), Authorization Request
     (JAR), and UserInfo
@@ -52,8 +53,3 @@ Optional caching: pass a `StorageProvider` as `options.cache` so tokens are
 reused until near expiry. See
 [scratches/client-credentials-grant.ts](scratches/client-credentials-grant.ts)
 for a full example.
-
-## Planned Features
-
-- Expand RFC 9728 support to include `application/oauth-protected-resource-jwt`
-  responses
