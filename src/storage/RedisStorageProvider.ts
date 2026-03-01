@@ -63,7 +63,8 @@ export class RedisStorageProvider implements StorageProvider {
   }
 
   async clear(): Promise<void> {
-    await this.redis.del(`${this.options.prefix}*`);
+    const keys = await this.redis.keys(`${this.options.prefix}*`);
+    await this.redis.unlink(...keys);
   }
 
   async keys(): Promise<string[]> {
@@ -75,6 +76,6 @@ export class RedisStorageProvider implements StorageProvider {
   }
 
   async get(key: string): Promise<string | null> {
-    return await this.redis.get(this.createKey(key));
+    return this.redis.get(this.createKey(key));
   }
 }

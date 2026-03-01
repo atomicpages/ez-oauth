@@ -1,4 +1,3 @@
-import { HTTPError } from "ky";
 import type { DPoPOptions } from "openid-client";
 import * as client from "openid-client";
 import { OAuthClientError } from "./errors/OAuthClientError";
@@ -138,10 +137,19 @@ export class ClientCredentialsGrant {
     parameters?: Record<string, string>,
     grantOptions?: DPoPOptions,
   ): Promise<ClientCredentialsTokenResponse> {
-    const params: Record<string, string> = {
-      ...this.config.additionalParams,
-      ...(parameters ?? {}),
-    };
+    const additional = this.config.additionalParams as Record<
+      string,
+      string | string[]
+    >;
+
+    const params: Record<string, string> = Object.fromEntries(
+      Object.entries(additional).map(([k, v]) => [
+        k,
+        Array.isArray(v) ? v.join(" ") : v,
+      ]),
+    );
+
+    Object.assign(params, parameters ?? {});
 
     if (this.config.scopes.length > 0) {
       params["scope"] = this.config.scopes.join(" ");
@@ -157,9 +165,15 @@ export class ClientCredentialsGrant {
       if (e instanceof client.ClientError) {
         let reason: unknown;
 
-        if (e.cause instanceof HTTPError) {
+        const cause = e.cause as
+          | {
+              response?: { body?: { json?: () => Promise<unknown> } };
+            }
+          | undefined;
+
+        if (cause?.response?.body?.json) {
           try {
-            reason = await e.cause.response.body?.json();
+            reason = await cause.response.body.json();
           } catch {
             reason = undefined;
           }
@@ -170,6 +184,7 @@ export class ClientCredentialsGrant {
           { cause: e, reason },
         );
       }
+
       throw e;
     }
   }

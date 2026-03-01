@@ -1,13 +1,13 @@
 import { afterEach, expect, mock, test } from "bun:test";
 import * as realOpenIdClient from "openid-client";
-import { MemoryStorageProvider } from "./storage/MemoryStorageProvider";
+import { MemoryStorageProvider } from "../storage/MemoryStorageProvider";
 
 const TOKEN_URL = "https://as.example.com/token";
 const AUTH_URL = "https://as.example.com/authorize";
 const PLACEHOLDER_REDIRECT = "http://localhost";
 
 async function createTestConfig(scopes: string[] = []) {
-  const { OAuthConfig } = await import("./OAuthConfig");
+  const { OAuthConfig } = await import("../OAuthConfig");
   const config = OAuthConfig.create(
     {
       tokenUrl: TOKEN_URL,
@@ -40,10 +40,10 @@ test("requestToken merges config scopes and additionalParams and calls openid-cl
     clientCredentialsGrant: grantFn,
   }));
 
-  const { OAuthConfig: Config } = await import("./OAuthConfig");
+  const { OAuthConfig: Config } = await import("../OAuthConfig");
 
   const { ClientCredentialsGrant: CCGrant } = await import(
-    "./ClientCredentialsGrant"
+    "../ClientCredentialsGrant"
   );
 
   const config = Config.create(
@@ -81,7 +81,7 @@ test("requestToken passes through parameters (e.g. resource)", async () => {
   }));
 
   const { ClientCredentialsGrant: CCGrant } = await import(
-    "./ClientCredentialsGrant"
+    "../ClientCredentialsGrant"
   );
 
   const config = await createTestConfig();
@@ -108,7 +108,7 @@ test("getToken with cache: first call requests token and saves to cache, second 
   }));
 
   const { ClientCredentialsGrant: CCGrant } = await import(
-    "./ClientCredentialsGrant"
+    "../ClientCredentialsGrant"
   );
 
   const config = await createTestConfig(["scope1"]);
@@ -137,7 +137,7 @@ test("getToken with cache uses custom cacheKey when provided", async () => {
   }));
 
   const { ClientCredentialsGrant: CCGrant } = await import(
-    "./ClientCredentialsGrant"
+    "../ClientCredentialsGrant"
   );
 
   const config = await createTestConfig();
@@ -162,7 +162,7 @@ test("getToken with cache and expired entry requests new token", async () => {
   }));
 
   const { ClientCredentialsGrant: CCGrant } = await import(
-    "./ClientCredentialsGrant"
+    "../ClientCredentialsGrant"
   );
 
   const config = await createTestConfig();
@@ -193,9 +193,9 @@ test("requestToken wraps openid-client ClientError as OAuthClientError", async (
   }));
 
   const { ClientCredentialsGrant: CCGrant } = await import(
-    "./ClientCredentialsGrant"
+    "../ClientCredentialsGrant"
   );
-  const { OAuthClientError } = await import("./errors/OAuthClientError");
+  const { OAuthClientError } = await import("../errors/OAuthClientError");
 
   const config = await createTestConfig();
   const grant = new CCGrant(config);

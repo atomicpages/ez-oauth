@@ -1,4 +1,3 @@
-import { HTTPError } from "ky";
 import * as client from "openid-client";
 import URLSheriff from "url-sheriff";
 import type { DiscoverOptions } from "./discovery";
@@ -7,7 +6,7 @@ import { OAuthStateError } from "./errors/OAuthStateError";
 import type { OAuthConfig } from "./OAuthConfig";
 import { OAuthState } from "./state/OAuthState";
 import type { StorageProvider } from "./storage/StorageProvider";
-import { toURL } from "./utils/url";
+import { redirectUriMatches, toURL } from "./utils/url";
 
 type URLSheriffConfig = ConstructorParameters<typeof URLSheriff>[0];
 
@@ -82,10 +81,19 @@ export class OAuthClient {
   ): Promise<
     Awaited<ReturnType<typeof client.authorizationCodeGrant>> | undefined
   > {
+    const callbackUrl = toURL(url);
+
+    if (!redirectUriMatches(callbackUrl, this.config.redirectUri)) {
+      throw new OAuthClientError(
+        "Callback URL does not match configured redirect_uri",
+        { reason: "redirect_uri_mismatch" },
+      );
+    }
+
     try {
       const tokens = await client.authorizationCodeGrant(
         this.config.config,
-        toURL(url),
+        callbackUrl,
         {
           expectedState: this.state.state,
           pkceCodeVerifier: this.state.codeVerifier,
@@ -98,8 +106,12 @@ export class OAuthClient {
       if (e instanceof client.ClientError) {
         let reason: unknown;
 
-        if (e.cause instanceof HTTPError) {
-          reason = await e.cause?.response.body?.json();
+        const cause = e.cause as
+          | { response?: { body?: { json?: () => Promise<unknown> } } }
+          | undefined;
+
+        if (cause?.response?.body?.json) {
+          reason = await cause.response.body.json();
         }
 
         throw new OAuthClientError("Failed to get tokens from code grant", {
@@ -110,27 +122,75 @@ export class OAuthClient {
     }
   }
 
+  /**
+   * Exchange a refresh token for new tokens. If config is omitted, uses this client's
+   * config (same-client case). Pass config as first argument to use a different config
+   * (e.g. multi-tenant).
+   */
+  async refreshToken(
+    refreshToken: string,
+  ): Promise<Awaited<ReturnType<typeof client.refreshTokenGrant>>>;
+
   async refreshToken<T extends OAuthConfig = OAuthConfig>(
     config: T,
     refreshToken: string,
+  ): Promise<Awaited<ReturnType<typeof client.refreshTokenGrant>>>;
+
+  async refreshToken<T extends OAuthConfig = OAuthConfig>(
+    configOrRefreshToken: T | string,
+    refreshToken?: string,
   ): Promise<Awaited<ReturnType<typeof client.refreshTokenGrant>>> {
+    const useThisConfig = refreshToken === undefined;
+    const config = useThisConfig ? this.config : (configOrRefreshToken as T);
+
+    const token = useThisConfig
+      ? (configOrRefreshToken as string)
+      : (refreshToken as string);
+
+    const extraParams = useThisConfig
+      ? this.config.additionalParams
+      : (config as OAuthConfig).additionalParams;
+
     const tokens = await client.refreshTokenGrant(
       config.config,
-      refreshToken,
-      this.config.additionalParams,
+      token,
+      extraParams as Record<string, string>,
     );
 
     return tokens;
   }
 
+  /**
+   * Revoke an access or refresh token. If config is omitted, uses this client's config
+   * (same-client case). Pass config as first argument to use a different config
+   * (e.g. multi-tenant).
+   */
+  revokeToken(token: string): Promise<void>;
+
   revokeToken<T extends OAuthConfig = OAuthConfig>(
     config: T,
     token: string,
+  ): Promise<void>;
+
+  revokeToken<T extends OAuthConfig = OAuthConfig>(
+    configOrToken: T | string,
+    token?: string,
   ): Promise<void> {
+    const useThisConfig = token === undefined;
+    const config = useThisConfig ? this.config : (configOrToken as T);
+
+    const tokenToRevoke = useThisConfig
+      ? (configOrToken as string)
+      : (token as string);
+
+    const extraParams = useThisConfig
+      ? this.config.additionalParams
+      : (config as OAuthConfig).additionalParams;
+
     return client.tokenRevocation(
       config.config,
-      token,
-      this.config.additionalParams,
+      tokenToRevoke,
+      extraParams as Record<string, string>,
     );
   }
 

@@ -13,7 +13,7 @@ import { toURL } from "./utils/url";
  * Subclass this to customize HTTP behavior for specific providers
  */
 export class OAuthConfig {
-  protected _additionalParams: Record<string, string> = {};
+  protected _additionalParams: Record<string, string | string[]> = {};
   protected _scopes: string[] = [];
   readonly supportsPKCE: boolean = false;
   readonly redirectUri: URL;
@@ -24,13 +24,8 @@ export class OAuthConfig {
   ) {
     userConfig[client.customFetch] = this.createCustomFetch();
     this.supportsPKCE = userConfig.serverMetadata().supportsPKCE();
+    // redirect_uri may include query params by passing the full URL (e.g. https://app.example.com/cb?app_id=123)
     this.redirectUri = toURL(redirectUri);
-
-    if (this._additionalParams) {
-      for (const [key, value] of Object.entries(this._additionalParams)) {
-        this.redirectUri.searchParams.set(key, value);
-      }
-    }
   }
 
   get scopes() {
