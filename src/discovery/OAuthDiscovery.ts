@@ -8,7 +8,7 @@ import {
   jwtVerify,
 } from "jose";
 import ky from "ky";
-import type { Configuration } from "openid-client";
+import type { ClientMetadata, Configuration } from "openid-client";
 import * as client from "openid-client";
 import { toURL } from "../utils/url";
 
@@ -172,6 +172,11 @@ export type DiscoverOptions = {
 export type DcrOptions = {
   /** Not required for client-credentials (M2M) flow; omit when using only that grant. */
   redirectUri?: string | URL;
+  /**
+   * DCR request body sent to the AS (RFC 7591 / OIDC DCR): redirect_uris, client_name, scope,
+   * grant_types, token_endpoint_auth_method, etc. When absent, redirectUri (if set) is still sent as redirect_uris.
+   */
+  registrationMetadata?: Partial<ClientMetadata>;
   algorithm?: OAuthDiscoveryAlgorithm;
   /** Required when algorithm is protected-resource and the server returns JWT-signed metadata. */
   protectedResourceJwt?: ProtectedResourceDiscoveryJwtOptions;
@@ -355,6 +360,17 @@ export class OAuthDiscovery {
       options.protectedResourceJwt,
     );
 
-    return client.dynamicClientRegistration(server, {});
+    const metadata: Partial<ClientMetadata> = {
+      ...options.registrationMetadata,
+    };
+
+    if (
+      options.redirectUri !== undefined &&
+      metadata.redirect_uris === undefined
+    ) {
+      metadata.redirect_uris = [toURL(options.redirectUri).toString()];
+    }
+
+    return client.dynamicClientRegistration(server, metadata);
   }
 }

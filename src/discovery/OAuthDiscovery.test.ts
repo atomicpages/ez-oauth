@@ -1,5 +1,7 @@
 import { afterEach, expect, mock, test } from "bun:test";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
+import type { Configuration } from "openid-client";
+import * as realOpenIdClient from "openid-client";
 
 const RESOURCE_ID = "https://resource.example.com";
 const AS_ISSUER = "https://as.example.com";
@@ -201,4 +203,54 @@ test("resource in JWT does not match request resource identifier returns null", 
   );
 
   expect(result).toBeNull();
+});
+
+test("dcr passes registrationMetadata to dynamicClientRegistration", async () => {
+  const dcrFn = mock(async (_server: URL, _metadata: unknown) => {
+    return {} as Configuration;
+  });
+
+  mock.module("openid-client", () => ({
+    ...realOpenIdClient,
+    dynamicClientRegistration: dcrFn,
+  }));
+
+  const { OAuthDiscovery: Discovery } = await import("./OAuthDiscovery");
+  const metadata = {
+    redirect_uris: ["https://app.example.com/cb"],
+    client_name: "My App",
+  };
+
+  await Discovery.dcr(AS_ISSUER, { registrationMetadata: metadata });
+
+  expect(dcrFn).toHaveBeenCalledTimes(1);
+  const [, passedMetadata] = dcrFn.mock.calls[0] as [
+    URL,
+    Record<string, unknown>,
+  ];
+  expect(passedMetadata.redirect_uris).toEqual(["https://app.example.com/cb"]);
+  expect(passedMetadata.client_name).toBe("My App");
+});
+
+test("dcr sends redirectUri as redirect_uris when registrationMetadata does not set it", async () => {
+  const dcrFn = mock(async (_server: URL, _metadata: unknown) => {
+    return {} as Configuration;
+  });
+
+  mock.module("openid-client", () => ({
+    ...realOpenIdClient,
+    dynamicClientRegistration: dcrFn,
+  }));
+
+  const { OAuthDiscovery: Discovery } = await import("./OAuthDiscovery");
+  const redirectUri = "https://app.example.com/oauth/callback";
+
+  await Discovery.dcr(AS_ISSUER, { redirectUri });
+
+  expect(dcrFn).toHaveBeenCalledTimes(1);
+  const [, passedMetadata] = dcrFn.mock.calls[0] as [
+    URL,
+    Record<string, unknown>,
+  ];
+  expect(passedMetadata.redirect_uris).toEqual([redirectUri]);
 });
