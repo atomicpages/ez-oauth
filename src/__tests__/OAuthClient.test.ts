@@ -143,6 +143,105 @@ test("revokeToken(config, token) uses passed config", async () => {
   expect(passedConfig).toBe(configB.config);
 });
 
+test("introspectToken(token) uses this.config", async () => {
+  const tokenIntrospectionFn = mock(async () => ({ active: true }));
+
+  mock.module("openid-client", () => ({
+    ...realOpenIdClient,
+    tokenIntrospection: tokenIntrospectionFn,
+  }));
+
+  const { OAuthClient } = await import("../OAuthClient");
+  const { OAuthConfig: Config } = await import("../OAuthConfig");
+
+  const config = Config.create(
+    { tokenUrl: TOKEN_URL, authorizationUrl: AUTH_URL },
+    "client1",
+    PLACEHOLDER_REDIRECT,
+  );
+
+  const state = new OAuthState();
+  const client = new OAuthClient(config, state);
+
+  await client.introspectToken("my_access_token");
+
+  expect(tokenIntrospectionFn).toHaveBeenCalledTimes(1);
+  const [passedConfig, passedToken, passedParams] = tokenIntrospectionFn.mock
+    .calls[0] as [unknown, string, Record<string, string> | undefined];
+
+  expect(passedConfig).toBe(config.config);
+  expect(passedToken).toBe("my_access_token");
+  expect(passedParams).toBeUndefined();
+});
+
+test("introspectToken(token, tokenTypeHint) passes token_type_hint", async () => {
+  const tokenIntrospectionFn = mock(async () => ({ active: true }));
+
+  mock.module("openid-client", () => ({
+    ...realOpenIdClient,
+    tokenIntrospection: tokenIntrospectionFn,
+  }));
+
+  const { OAuthClient } = await import("../OAuthClient");
+  const { OAuthConfig: Config } = await import("../OAuthConfig");
+
+  const config = Config.create(
+    { tokenUrl: TOKEN_URL, authorizationUrl: AUTH_URL },
+    "client1",
+    PLACEHOLDER_REDIRECT,
+  );
+  const state = new OAuthState();
+  const client = new OAuthClient(config, state);
+
+  await client.introspectToken("my_token", "access_token");
+
+  expect(tokenIntrospectionFn).toHaveBeenCalledTimes(1);
+  const [, , passedParams] = tokenIntrospectionFn.mock.calls[0] as [
+    unknown,
+    string,
+    Record<string, string> | undefined,
+  ];
+  expect(passedParams).toEqual({ token_type_hint: "access_token" });
+});
+
+test("introspectToken(config, token) uses passed config", async () => {
+  const tokenIntrospectionFn = mock(async () => ({ active: true }));
+
+  mock.module("openid-client", () => ({
+    ...realOpenIdClient,
+    tokenIntrospection: tokenIntrospectionFn,
+  }));
+
+  const { OAuthClient } = await import("../OAuthClient");
+  const { OAuthConfig: Config } = await import("../OAuthConfig");
+
+  const configA = Config.create(
+    { tokenUrl: TOKEN_URL, authorizationUrl: AUTH_URL },
+    "client1",
+    PLACEHOLDER_REDIRECT,
+  );
+  const configB = Config.create(
+    {
+      tokenUrl: "https://other.as/token",
+      authorizationUrl: "https://other.as/auth",
+    },
+    "client2",
+    PLACEHOLDER_REDIRECT,
+  );
+  const state = new OAuthState();
+  const client = new OAuthClient(configA, state);
+
+  await client.introspectToken(configB, "my_access_token");
+
+  expect(tokenIntrospectionFn).toHaveBeenCalledTimes(1);
+  const [passedConfig, passedToken] = tokenIntrospectionFn.mock.calls[0] as [
+    unknown,
+    string,
+  ];
+  expect(passedConfig).toBe(configB.config);
+  expect(passedToken).toBe("my_access_token");
+});
+
 test("getTokensFromCodeGrant throws when callback URL does not match configured redirect_uri", async () => {
   const { OAuthClient } = await import("../OAuthClient");
   const { OAuthConfig: Config } = await import("../OAuthConfig");

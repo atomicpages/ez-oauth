@@ -195,6 +195,44 @@ export class OAuthClient {
   }
 
   /**
+   * Introspect an access or refresh token (RFC 7662). Requires AS metadata to include
+   * introspection_endpoint. If config is omitted, uses this client's config. Pass config
+   * as first argument to use a different config (e.g. multi-tenant).
+   * @param tokenTypeHint Optional hint: "access_token" or "refresh_token".
+   */
+  introspectToken(
+    token: string,
+    tokenTypeHint?: string,
+  ): Promise<Awaited<ReturnType<typeof client.tokenIntrospection>>>;
+
+  introspectToken<T extends OAuthConfig = OAuthConfig>(
+    config: T,
+    token: string,
+    tokenTypeHint?: string,
+  ): Promise<Awaited<ReturnType<typeof client.tokenIntrospection>>>;
+
+  introspectToken<T extends OAuthConfig = OAuthConfig>(
+    configOrToken: T | string,
+    tokenOrHint?: string,
+    tokenTypeHint?: string,
+  ): Promise<Awaited<ReturnType<typeof client.tokenIntrospection>>> {
+    const useThisConfig = typeof configOrToken === "string";
+    const config = useThisConfig ? this.config : (configOrToken as T);
+
+    const token = useThisConfig
+      ? (configOrToken as string)
+      : (tokenOrHint as string);
+
+    const hint = useThisConfig ? tokenOrHint : tokenTypeHint;
+
+    const parameters: Record<string, string> | undefined = hint
+      ? { token_type_hint: hint }
+      : undefined;
+
+    return client.tokenIntrospection(config.config, token, parameters);
+  }
+
+  /**
    * Build an OAuthClient from AS metadata discovery (one-call flow).
    * Does not cache; callers may cache the returned client's config or wrap discovery.
    */
